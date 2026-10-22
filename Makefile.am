@@ -18,6 +18,8 @@ if !GRAPHICS_DISABLED
 EXTRA_DIST += java
 endif
 EXTRA_DIST += CMakeLists.txt tesseract.pc.cmake cmake VERSION
+# Header shared by the unit tests, not listed in any _SOURCES.
+EXTRA_DIST += unittest/util/tempdir.h
 
 DIST_SUBDIRS = $(SUBDIRS)
 
@@ -1178,6 +1180,7 @@ check_PROGRAMS += ligature_table_test
 check_PROGRAMS += linlsq_test
 check_PROGRAMS += list_test
 check_PROGRAMS += lstm_layer_test
+check_PROGRAMS += lstm_nullchar_test
 if ENABLE_TRAINING
 check_PROGRAMS += lstm_recode_test
 check_PROGRAMS += lstm_squashed_test
@@ -1391,6 +1394,10 @@ loadlang_test_LDADD = $(TESS_LIBS) $(LEPTONICA_LIBS)
 lstm_layer_test_SOURCES = unittest/lstm_layer_test.cc
 lstm_layer_test_CPPFLAGS = $(unittest_CPPFLAGS)
 lstm_layer_test_LDADD = $(TESS_LIBS)
+
+lstm_nullchar_test_SOURCES = unittest/lstm_nullchar_test.cc
+lstm_nullchar_test_CPPFLAGS = $(unittest_CPPFLAGS)
+lstm_nullchar_test_LDADD = $(TESS_LIBS)
 
 lstm_recode_test_SOURCES = unittest/lstm_recode_test.cc
 lstm_recode_test_CPPFLAGS = $(unittest_CPPFLAGS)
