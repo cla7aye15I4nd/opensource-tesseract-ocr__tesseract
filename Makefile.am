@@ -20,6 +20,7 @@ endif
 EXTRA_DIST += CMakeLists.txt tesseract.pc.cmake cmake VERSION
 # Header shared by the unit tests, not listed in any _SOURCES.
 EXTRA_DIST += unittest/util/tempdir.h
+EXTRA_DIST += unittest/weightmatrix_test_helper.h
 
 DIST_SUBDIRS = $(SUBDIRS)
 
@@ -1140,6 +1141,7 @@ unittest_CPPFLAGS += -isystem $(top_srcdir)/unittest/third_party/googletest/goog
 
 check_PROGRAMS = apiexample_test
 if !DISABLED_LEGACY_ENGINE
+check_PROGRAMS += adaptive_templates_test
 check_PROGRAMS += adaptive_test
 endif # !DISABLED_LEGACY_ENGINE
 if ENABLE_TRAINING
@@ -1171,6 +1173,7 @@ check_PROGRAMS += imagedata_test
 if !DISABLED_LEGACY_ENGINE
 check_PROGRAMS += indexmapbidi_test
 check_PROGRAMS += intfeaturemap_test
+check_PROGRAMS += intproto_addclass_test
 check_PROGRAMS += intproto_test
 endif # !DISABLED_LEGACY_ENGINE
 check_PROGRAMS += intsimdmatrix_test
@@ -1248,6 +1251,7 @@ check_PROGRAMS += validator_test
 endif # ENABLE_TRAINING
 check_PROGRAMS += weightmatrix_deserialize_test
 check_PROGRAMS += weightmatrix_intdim_test
+check_PROGRAMS += weightmatrix_scales_test
 
 check_PROGRAMS: libtesseract.la libtesseract_training.la
 
@@ -1259,6 +1263,12 @@ apiexample_test_SOURCES = unittest/apiexample_test.cc
 apiexample_test_CPPFLAGS = $(unittest_CPPFLAGS)
 apiexample_test_LDFLAGS = $(LEPTONICA_LIBS)
 apiexample_test_LDADD = $(TESS_LIBS) $(LEPTONICA_LIBS)
+
+if !DISABLED_LEGACY_ENGINE
+adaptive_templates_test_SOURCES = unittest/adaptive_templates_test.cc
+adaptive_templates_test_CPPFLAGS = $(unittest_CPPFLAGS)
+adaptive_templates_test_LDADD = $(TESS_LIBS)
+endif # !DISABLED_LEGACY_ENGINE
 
 if !DISABLED_LEGACY_ENGINE
 adaptive_test_SOURCES = unittest/adaptive_test.cc
@@ -1346,6 +1356,12 @@ if !DISABLED_LEGACY_ENGINE
 intfeaturemap_test_SOURCES = unittest/intfeaturemap_test.cc
 intfeaturemap_test_CPPFLAGS = $(unittest_CPPFLAGS)
 intfeaturemap_test_LDADD = $(TRAINING_LIBS)
+endif # !DISABLED_LEGACY_ENGINE
+
+if !DISABLED_LEGACY_ENGINE
+intproto_addclass_test_SOURCES = unittest/intproto_addclass_test.cc
+intproto_addclass_test_CPPFLAGS = $(unittest_CPPFLAGS)
+intproto_addclass_test_LDADD = $(TESS_LIBS)
 endif # !DISABLED_LEGACY_ENGINE
 
 if !DISABLED_LEGACY_ENGINE
@@ -1601,6 +1617,10 @@ weightmatrix_deserialize_test_LDADD = $(TESS_LIBS)
 weightmatrix_intdim_test_SOURCES = unittest/weightmatrix_intdim_test.cc
 weightmatrix_intdim_test_CPPFLAGS = $(unittest_CPPFLAGS)
 weightmatrix_intdim_test_LDADD = $(TESS_LIBS)
+
+weightmatrix_scales_test_SOURCES = unittest/weightmatrix_scales_test.cc
+weightmatrix_scales_test_CPPFLAGS = $(unittest_CPPFLAGS)
+weightmatrix_scales_test_LDADD = $(TESS_LIBS)
 
 # for windows
 if T_WIN
