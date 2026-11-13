@@ -541,6 +541,7 @@ void TessBaseAPI::SetImage(Pix *pix) {
 
 /**
  * Restrict recognition to a sub-rectangle of the image. Call after SetImage.
+ * The rectangle is clipped to the image.
  * Each SetRectangle clears the recognition results so multiple rectangles
  * can be recognized with the same image.
  */
@@ -1998,6 +1999,12 @@ bool TessBaseAPI::Threshold(Pix **pix) {
   if (*pix != nullptr) {
     pixDestroy(pix);
   }
+  thresholder_->GetImageSizes(&rect_left_, &rect_top_, &rect_width_, &rect_height_, &image_width_,
+                              &image_height_);
+  if (rect_width_ <= 0 || rect_height_ <= 0) {
+    tprintf("Error: The rectangle to recognize is empty or outside of the image.\n");
+    return false;
+  }
   // Zero resolution messes up the algorithms, so make sure it is credible.
   int user_dpi = 0;
   GetIntVariable("user_defined_dpi", &user_dpi);
@@ -2047,9 +2054,6 @@ bool TessBaseAPI::Threshold(Pix **pix) {
     tesseract_->set_pix_thresholds(pix_thresholds);
     tesseract_->set_pix_grey(pix_grey);
   }
-
-  thresholder_->GetImageSizes(&rect_left_, &rect_top_, &rect_width_, &rect_height_, &image_width_,
-                              &image_height_);
 
   // Set the internal resolution that is used for layout parameters from the
   // estimated resolution, rather than the image resolution, which may be
@@ -2218,6 +2222,14 @@ int TessBaseAPI::TextLength(int *blob_count) const {
  */
 bool TessBaseAPI::DetectOS(OSResults *osr) {
   if (tesseract_ == nullptr) {
+    return false;
+  }
+  if (tesseract_->PreTrainedTemplates == nullptr) {
+    // Orientation and script detection classifies with the legacy classifier
+    // of the primary language. Without its templates (for example the
+    // tessdata_fast or tessdata_best model of a language other than osd, or
+    // layout analysis only) the detector gets no script information.
+    tprintf("Error: OSD requires a model for the legacy engine, e.g. osd.traineddata\n");
     return false;
   }
   ClearResults();

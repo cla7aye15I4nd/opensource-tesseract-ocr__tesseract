@@ -290,6 +290,51 @@ TEST_F(TesseractTest, AdaptToWordStrTest) {
 #endif
 }
 
+// A rectangle that extends beyond the image must be clipped to the image.
+// Thresholding reads rect_width_ x rect_height_ pixels from the source image
+// and used to read past its end.
+TEST_F(TesseractTest, SetRectangleIsClippedToImage) {
+  Image src_pix = pixCreate(100, 60, 8);
+  CHECK(src_pix);
+  pixSetAll(src_pix);
+  Box *box = boxCreate(10, 10, 30, 20);
+  pixClearInRect(src_pix, box);
+  boxDestroy(&box);
+  struct TestCase {
+    int left, top, width, height;
+    int expected_width, expected_height;
+  };
+  const TestCase cases[] = {
+      {10, 10, 20, 20, 20, 20},         // Inside the image: unchanged.
+      {80, 40, 50, 50, 20, 20},         // Beyond the right and bottom edges.
+      {-10, -10, 30, 30, 20, 20},       // Beyond the left and top edges.
+      {90, 0, 1000000000, 60, 10, 60},  // Huge width must not overflow.
+  };
+  for (const auto &test : cases) {
+    tesseract::TessBaseAPI api;
+    api.InitForAnalysePage();
+    api.SetImage(src_pix);
+    api.SetRectangle(test.left, test.top, test.width, test.height);
+    Pix *thresholded = api.GetThresholdedImage();
+    ASSERT_NE(nullptr, thresholded);
+    EXPECT_EQ(test.expected_width, pixGetWidth(thresholded));
+    EXPECT_EQ(test.expected_height, pixGetHeight(thresholded));
+    pixDestroy(&thresholded);
+  }
+  // An empty rectangle, or one that is entirely outside of the image, cannot
+  // be recognized: this must fail cleanly.
+  const int empty_rects[][4] = {
+      {0, 0, 0, 0}, {10, 10, 0, 20}, {200, 200, 10, 10}, {-50, 0, 20, 20}};
+  for (const auto &rect : empty_rects) {
+    tesseract::TessBaseAPI api;
+    api.InitForAnalysePage();
+    api.SetImage(src_pix);
+    api.SetRectangle(rect[0], rect[1], rect[2], rect[3]);
+    EXPECT_EQ(nullptr, api.GetThresholdedImage());
+  }
+  src_pix.destroy();
+}
+
 // Tests that LSTM gets exactly the right answer on phototest.
 TEST_F(TesseractTest, BasicLSTMTest) {
   tesseract::TessBaseAPI api;
@@ -397,6 +442,46 @@ TEST_F(TesseractTest, OsdEngineUsesMinCharactersToTry) {
   ASSERT_EQ(0, api.FindLines());
   ASSERT_EQ(osd_tess, api.osd_tesseract());
   EXPECT_EQ(2, static_cast<int>(osd_tess->min_characters_to_try));
+#endif
+}
+
+// Orientation and script detection needs a model for the legacy engine of the
+// primary language. Without one it must fail instead of throwing an exception.
+TEST_F(TesseractTest, DetectOrientationScriptNeedsLegacyModel) {
+#ifdef DISABLED_LEGACY_ENGINE
+  // Skip test because TessBaseAPI::DetectOrientationScript is missing.
+  GTEST_SKIP();
+#else
+  REQUIRE_TRAINEDDATA(TESSDATA_DIR, "eng");
+  REQUIRE_TRAINEDDATA(TESSDATA_DIR, "osd");
+  Image src_pix = pixRead(TestDataNameToPath("phototest.tif").c_str());
+  CHECK(src_pix);
+  // Each case initializes the API with the given language, or skips Init.
+  for (int test_case = 0; test_case < 3; ++test_case) {
+    tesseract::TessBaseAPI api;
+    switch (test_case) {
+      case 0: // LSTM only model.
+        ASSERT_EQ(0, api.Init(TessdataPath().c_str(), "eng", tesseract::OEM_LSTM_ONLY));
+        break;
+      case 1: // The primary language has no legacy model, a secondary one has.
+        // osd has no LSTM model, so it falls back to the legacy engine, while
+        // eng is loaded without its legacy model even if the file has one.
+        ASSERT_EQ(0, api.Init(TessdataPath().c_str(), "eng+osd", tesseract::OEM_LSTM_ONLY));
+        break;
+      default: // Layout analysis only.
+        api.InitForAnalysePage();
+        break;
+    }
+    api.SetImage(src_pix);
+    int orient_deg = -1;
+    float orient_conf = 0;
+    const char *script_name = nullptr;
+    float script_conf = 0;
+    EXPECT_FALSE(
+        api.DetectOrientationScript(&orient_deg, &orient_conf, &script_name, &script_conf))
+        << "case " << test_case;
+  }
+  src_pix.destroy();
 #endif
 }
 
