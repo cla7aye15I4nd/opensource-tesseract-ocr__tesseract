@@ -701,21 +701,23 @@ void Tesseract::rejection_passes(PAGE_RES *page_res, ETEXT_DESC *monitor,
     page_res_it.forward();
   }
 
+  // A page can hold words but no characters (all blobs on the reject lists),
+  // so the ratios below must not be computed with char_count == 0.
   if (tessedit_debug_quality_metrics) {
+    const float char_count = (page_res->char_count > 0) ? page_res->char_count : 1;
     tprintf(
         "QUALITY: num_chs= %d  num_rejs= %d %5.3f blob_qual= %d %5.3f"
         " outline_errs= %d %5.3f char_qual= %d %5.3f good_ch_qual= %d %5.3f\n",
-        page_res->char_count, page_res->rej_count,
-        page_res->rej_count / static_cast<float>(page_res->char_count), stats_.doc_blob_quality,
-        stats_.doc_blob_quality / static_cast<float>(page_res->char_count), stats_.doc_outline_errs,
-        stats_.doc_outline_errs / static_cast<float>(page_res->char_count), stats_.doc_char_quality,
-        stats_.doc_char_quality / static_cast<float>(page_res->char_count),
-        stats_.doc_good_char_quality,
+        page_res->char_count, page_res->rej_count, page_res->rej_count / char_count,
+        stats_.doc_blob_quality, stats_.doc_blob_quality / char_count, stats_.doc_outline_errs,
+        stats_.doc_outline_errs / char_count, stats_.doc_char_quality,
+        stats_.doc_char_quality / char_count, stats_.doc_good_char_quality,
         (stats_.good_char_count > 0)
             ? (stats_.doc_good_char_quality / static_cast<float>(stats_.good_char_count))
             : 0.0);
   }
   bool good_quality_doc =
+      (page_res->char_count > 0) &&
       ((page_res->rej_count / static_cast<float>(page_res->char_count)) <= quality_rej_pc) &&
       (stats_.doc_blob_quality / static_cast<float>(page_res->char_count) >= quality_blob_pc) &&
       (stats_.doc_outline_errs / static_cast<float>(page_res->char_count) <= quality_outline_pc) &&
@@ -1908,20 +1910,21 @@ ACCEPTABLE_WERD_TYPE Tesseract::check_abbreviation(const UNICHARSET &char_set, c
                                                    ACCEPTABLE_WERD_TYPE word_type) {
   if (word_type == AC_UNACCEPTABLE) {
     /* Look for abbreviation string */
+    int i = 0;
     int offset = 0;
     if (s[0] != '\0' && char_set.get_isupper(s, lengths[0])) {
       word_type = AC_UC_ABBREV;
-      while (s[offset] != '\0' && char_set.get_isupper(s + offset, lengths[offset]) &&
-             lengths[offset + 1] == 1 && s[offset + lengths[offset]] == '.') {
-        offset += lengths[offset++];
-        offset += lengths[offset++];
+      while (s[offset] != '\0' && char_set.get_isupper(s + offset, lengths[i]) &&
+             lengths[i + 1] == 1 && s[offset + lengths[i]] == '.') {
+        offset += lengths[i++];
+        offset += lengths[i++];
       }
     } else if (s[0] != '\0' && char_set.get_islower(s, lengths[0])) {
       word_type = AC_LC_ABBREV;
-      while (s[offset] != '\0' && char_set.get_islower(s + offset, lengths[offset]) &&
-             lengths[offset + 1] == 1 && s[offset + lengths[offset]] == '.') {
-        offset += lengths[offset++];
-        offset += lengths[offset++];
+      while (s[offset] != '\0' && char_set.get_islower(s + offset, lengths[i]) &&
+             lengths[i + 1] == 1 && s[offset + lengths[i]] == '.') {
+        offset += lengths[i++];
+        offset += lengths[i++];
       }
     }
     if (s[offset] != '\0') {

@@ -205,6 +205,7 @@ public:
   // Destroy any existing pix and return a pointer to the pointer.
   Image *mutable_pix_binary() {
     pix_binary_.destroy();
+    pix_removed_lines_.destroy();
     return &pix_binary_;
   }
   Image pix_binary() const {
@@ -255,6 +256,14 @@ public:
   }
   void set_source_resolution(int ppi) {
     source_resolution_ = ppi;
+  }
+  // Number of columns which the automatic multi-column recognition
+  // (textord_auto_columns) used for the last page, 0 if it did not split it.
+  int auto_columns_used() const {
+    return auto_columns_used_;
+  }
+  void set_auto_columns_used(int columns) {
+    auto_columns_used_ = columns;
   }
   int ImageWidth() const {
     return pixGetWidth(pix_binary_);
@@ -572,9 +581,9 @@ public:
   // make rej map for word
   void make_reject_map(WERD_RES *word, int16_t pass);
   bool one_ell_conflict(WERD_RES *word_res, bool update_map);
-  int16_t first_alphanum_index(const char *word, const char *word_lengths);
-  int16_t first_alphanum_offset(const char *word, const char *word_lengths);
-  int16_t alpha_count(const char *word, const char *word_lengths);
+  int first_alphanum_index(const char *word, const char *word_lengths);
+  int first_alphanum_offset(const char *word, const char *word_lengths);
+  int alpha_count(const char *word, const char *word_lengths);
   bool word_contains_non_1_digit(const char *word, const char *word_lengths);
   void dont_allow_1Il(WERD_RES *word);
   int16_t count_alphanums( // how many alphanums
@@ -956,6 +965,7 @@ public:
   double_VAR_H(min_orientation_margin);
   BOOL_VAR_H(textord_tabfind_show_vlines);
   BOOL_VAR_H(textord_use_cjk_fp_model);
+  BOOL_VAR_H(textord_auto_columns);
   BOOL_VAR_H(poly_allow_detailed_fx);
   BOOL_VAR_H(tessedit_init_config_only);
 #ifndef DISABLED_LEGACY_ENGINE
@@ -990,6 +1000,12 @@ private:
   // Image used for input to layout analysis and tesseract recognition.
   // May be modified by the ShiroRekhaSplitter to eliminate the top-line.
   Image pix_binary_;
+  // Columns used by the last automatic multi-column recognition (0 = none).
+  int auto_columns_used_ = 0;
+  // The pixels of the lines which the layout analysis removed from the binary
+  // image, or nullptr. Kept for the font style pass, which needs them to find
+  // underlined words.
+  Image pix_removed_lines_;
   // Grey-level input image if the input was not binary, otherwise nullptr.
   Image pix_grey_;
   // Original input image. Color if the input was color.

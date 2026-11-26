@@ -172,6 +172,10 @@ void ImageThresholder::SetImage(const Image pix) {
   // not just a clone of the input.
   if (depth > 1 && depth < 8) {
     pix_ = pixConvertTo8(src, false);
+  } else if (depth == 24) {
+    // Packed 24 bpp is not plain RGB: most Leptonica functions
+    // (e.g. pixRotateOrth) only accept RGB with 32 bpp.
+    pix_ = pixConvert24To32(src);
   } else {
     pix_ = src.copy();
   }
@@ -188,6 +192,13 @@ std::tuple<bool, Image, Image, Image> ImageThresholder::Threshold(
                                                       ThresholdMethod method) {
   Image pix_binary = nullptr;
   Image pix_thresholds = nullptr;
+
+  // Layout analysis stores coordinates as TDimension (int16_t), so larger
+  // images must be refused here just like in ThresholdToPix.
+  if (image_width_ > INT16_MAX || image_height_ > INT16_MAX) {
+    tprintf("Image too large: (%d, %d)\n", image_width_, image_height_);
+    return std::make_tuple(false, nullptr, nullptr, nullptr);
+  }
 
   if (pix_channels_ == 0) {
     // We have a binary image, but it still has to be copied, as this API
@@ -303,6 +314,12 @@ bool ImageThresholder::ThresholdToPix(Image *pix) {
   Image src = pix_;
   if (pixGetColormap(src)) {
     src = pixRemoveColormap(src, REMOVE_CMAP_BASED_ON_SRC);
+    if (src == nullptr) {
+      // A colormap with non-grey entries expands to 32 bpp, which can exceed
+      // the Leptonica image size limit even when the 8 bpp source fits.
+      tprintf("Failed to remove colormap: (%d, %d)\n", image_width_, image_height_);
+      return false;
+    }
   }
   OtsuThresholdRectToPix(src, pix);
   if (src != pix_) {

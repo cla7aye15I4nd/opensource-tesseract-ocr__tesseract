@@ -976,7 +976,7 @@ wordlist2dawg_CPPFLAGS = $(training_CPPFLAGS)
 wordlist2dawg_SOURCES = src/training/wordlist2dawg.cpp
 wordlist2dawg_LDADD = $(extralib)
 
-# fuzzer-api is used for fuzzing tests.
+# fuzzer-api and fuzzer-raw-image are used for fuzzing tests.
 # They are run by OSS-Fuzz https://oss-fuzz.com/, but can also be run locally.
 # Note: -fsanitize=fuzzer currently requires the clang++ compiler.
 
@@ -1020,7 +1020,30 @@ fuzzer-api-512x256: unittest/fuzzers/fuzzer-api.cpp
           $(libcurl_LIBS) \
           -o $@
 
+# fuzzer-raw-image gets the page segmentation mode and the size, depth and
+# resolution of the image from a text line at the start of the fuzz input.
+# Run it with -dict=$(top_srcdir)/unittest/fuzzers/fuzzer-raw-image.dict.
+fuzzer-raw-image: libtesseract.la
+fuzzer-raw-image: unittest/fuzzers/fuzzer-raw-image.cpp
+	$(CXX) $(DEFS) $(CXXFLAGS) -g $(LIB_FUZZING_ENGINE) \
+          -I $(top_srcdir)/include \
+          -I $(builddir)/include \
+          $(LEPTONICA_CFLAGS) \
+          $(OPENMP_CXXFLAGS) \
+          $< \
+          $(builddir)/.libs/libtesseract.a \
+          $(LEPTONICA_LIBS) \
+          $(libarchive_LIBS) \
+          $(libcurl_LIBS) \
+          -o $@
+
+# The seed corpus for fuzzer-raw-image is generated, so that no image files
+# are needed.
+fuzzer-raw-image_seed_corpus.zip: unittest/fuzzers/fuzzer-raw-image-seeds.py
+	python3 $< $@
+
 CLEANFILES += fuzzer-api fuzzer-api-512x256
+CLEANFILES += fuzzer-raw-image fuzzer-raw-image_seed_corpus.zip
 
 if ASCIIDOCTOR
 
@@ -1212,6 +1235,7 @@ check_PROGRAMS += mastertrainer_test
 endif # !DISABLED_LEGACY_ENGINE
 check_PROGRAMS += matrix_deserializesize_test
 check_PROGRAMS += matrix_test
+check_PROGRAMS += multicolumn_test
 check_PROGRAMS += networkio_test
 if !DISABLED_LEGACY_ENGINE
 check_PROGRAMS += normproto_test
@@ -1229,6 +1253,7 @@ if ENABLE_TRAINING
 check_PROGRAMS += pango_font_info_test
 endif # ENABLE_TRAINING
 check_PROGRAMS += paragraphs_test
+check_PROGRAMS += pdfrenderer_test
 check_PROGRAMS += plumbing_dimensions_test
 check_PROGRAMS += plumbing_test
 if !DISABLED_LEGACY_ENGINE
@@ -1486,6 +1511,10 @@ matrix_test_SOURCES = unittest/matrix_test.cc
 matrix_test_CPPFLAGS = $(unittest_CPPFLAGS)
 matrix_test_LDADD = $(TESS_LIBS)
 
+multicolumn_test_SOURCES = unittest/multicolumn_test.cc
+multicolumn_test_CPPFLAGS = $(unittest_CPPFLAGS)
+multicolumn_test_LDADD = $(TRAINING_LIBS) $(LEPTONICA_LIBS)
+
 networkio_test_SOURCES = unittest/networkio_test.cc
 networkio_test_CPPFLAGS = $(unittest_CPPFLAGS)
 networkio_test_LDADD = $(TESS_LIBS)
@@ -1526,6 +1555,10 @@ pango_font_info_test_LDADD += $(pangoft2_LIBS)
 paragraphs_test_SOURCES = unittest/paragraphs_test.cc
 paragraphs_test_CPPFLAGS = $(unittest_CPPFLAGS)
 paragraphs_test_LDADD = $(TESS_LIBS)
+
+pdfrenderer_test_SOURCES = unittest/pdfrenderer_test.cc
+pdfrenderer_test_CPPFLAGS = $(unittest_CPPFLAGS)
+pdfrenderer_test_LDADD = $(TESS_LIBS) $(LEPTONICA_LIBS)
 
 plumbing_dimensions_test_SOURCES = unittest/plumbing_dimensions_test.cc
 plumbing_dimensions_test_CPPFLAGS = $(unittest_CPPFLAGS)

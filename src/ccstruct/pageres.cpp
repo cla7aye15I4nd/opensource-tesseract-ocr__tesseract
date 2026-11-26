@@ -258,6 +258,7 @@ void WERD_RES::CopySimpleFields(const WERD_RES &source) {
   done = source.done;
   unlv_crunch_mode = source.unlv_crunch_mode;
   small_caps = source.small_caps;
+  underlined = source.underlined;
   odd_size = source.odd_size;
   budget_skipped = source.budget_skipped;
   fontinfo = source.fontinfo;
@@ -985,10 +986,6 @@ bool WERD_RES::ConditionalBlobMerge(
       best_choice->set_unichar_id(new_id, i);
       modified = true;
       MergeAdjacentBlobs(i);
-      const MATRIX_COORD &coord = best_choice->MatrixCoord(i);
-      if (!coord.Valid(*ratings)) {
-        ratings->IncreaseBandSize(coord.row + 1 - coord.col);
-      }
       BLOB_CHOICE_LIST *blob_choices = GetBlobChoices(i);
       if (FindMatchingChoice(new_id, blob_choices) == nullptr) {
         // Insert a fake result.
@@ -1009,11 +1006,21 @@ void WERD_RES::MergeAdjacentBlobs(unsigned index) {
     reject_map.remove_pos(index);
   }
   best_choice->remove_unichar_id(index + 1);
-  rebuild_word->MergeBlobs(index, index + 2);
+  if (rebuild_word != nullptr) {
+    // Words from the LSTM recognizer have no rebuild_word.
+    rebuild_word->MergeBlobs(index, index + 2);
+  }
   box_word->MergeBoxes(index, index + 2);
   if (index + 1 < best_state.size()) {
     best_state[index] += best_state[index + 1];
     best_state.erase(best_state.begin() + index + 1);
+  }
+  if (ratings != nullptr) {
+    // The merged blob may need a wider band in the ratings matrix.
+    const MATRIX_COORD &coord = best_choice->MatrixCoord(index);
+    if (!coord.Valid(*ratings)) {
+      ratings->IncreaseBandSize(coord.row + 1 - coord.col);
+    }
   }
 }
 
@@ -1768,8 +1775,8 @@ WERD_RES *PAGE_RES_IT::forward_block() {
 }
 
 void PAGE_RES_IT::rej_stat_word() {
-  int16_t chars_in_word;
-  int16_t rejects_in_word = 0;
+  int chars_in_word;
+  int rejects_in_word = 0;
 
   chars_in_word = word_res->reject_map.length();
   page_res->char_count += chars_in_word;

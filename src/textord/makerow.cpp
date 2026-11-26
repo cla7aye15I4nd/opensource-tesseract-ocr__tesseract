@@ -28,6 +28,7 @@
 #include "ccstruct.h"
 #include "detlinefit.h"
 #include "drawtord.h"
+#include "helpers.h" // for ClipToRange
 #include "oldbasel.h"
 #include "sortflts.h"
 #include "statistc.h"
@@ -169,6 +170,9 @@ static float MakeRowFromSubBlobs(TO_BLOCK *block, C_BLOB *blob, TO_ROW_IT *row_i
     // Correct direction as needed.
     blob->CheckInverseFlagAndDirection();
     auto *bbox = new BLOBNBOX(blob);
+    // The copy belongs to nobody else, so the BLOBNBOX has to delete it
+    // unless it is moved to a word later.
+    bbox->set_owns_cblob(true);
     bb_it.add_after_then_move(bbox);
   }
   // Now we can make a row from the blobs.
@@ -1165,7 +1169,7 @@ void compute_row_stats( // find lines
   float iqr;         // inter quartile range
   TO_ROW_IT row_it = block->get_rows();
   // number of rows
-  int16_t rowcount = row_it.length();
+  int32_t rowcount = row_it.length();
   // for choose nth
   std::vector<TO_ROW *> rows(rowcount);
   rowcount = 0;
@@ -1820,7 +1824,8 @@ void separate_underlines(TO_BLOCK *block,   // block to do
         ASSERT_HOST(blob->cblob() != nullptr);
         rotated_blob = crotate_cblob(blob->cblob(), blob_rotation);
         if (test_underline(testing_on && textord_show_final_rows, rotated_blob,
-                           static_cast<int16_t>(row->intercept()),
+                           static_cast<int16_t>(
+                               ClipToRange<float>(row->intercept(), -INT16_MAX, INT16_MAX)),
                            static_cast<int16_t>(block->line_size *
                                                 (tesseract::CCStruct::kXHeightFraction +
                                                  tesseract::CCStruct::kAscenderFraction / 2.0f)))) {
@@ -2291,7 +2296,7 @@ void assign_blobs_to_rows( // find lines
   float ycoord;                 // current y
   float top, bottom;            // of blob
   float g_length = 1.0f;        // from gradient
-  int16_t row_count;            // no of rows
+  int32_t row_count;            // no of rows
   int16_t left_x;               // left edge
   int16_t last_x;               // previous edge
   float block_skew;             // y delta
